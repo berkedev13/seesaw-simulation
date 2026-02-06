@@ -11,7 +11,7 @@
     <div class="hud">
       <div class="stat">
         <div class="label">LEFT WEIGHT</div>
-        <div class="value">0.0 kg</div>
+        <div class="value" id="leftWeightVal">0.0 kg</div>
       </div>
       <div class="stat">
         <div class="label">NEXT WEIGHT</div>
@@ -19,7 +19,7 @@
       </div>
       <div class="stat">
         <div class="label">RIGHT WEIGHT</div>
-        <div class="value">0.0 kg</div>
+        <div class="value" id="rightWeightVal">0.0 kg</div>
       </div>
       <div class="stat">
         <div class="label">TILT ANGLE</div>
@@ -31,7 +31,9 @@
       <div class="pivot"></div>
       <div class="pivot-cap" aria-hidden="true"></div>
 
-      <div class="plank" id="plank"></div>
+      <div class="plank" id="plank">
+        <div class="placed-layer"></div>
+      </div>
 
       <div class="ghost-overlay" aria-hidden="true">
         <div class="weight weight--ghost" id="ghostWeight">5kg</div>

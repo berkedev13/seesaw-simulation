@@ -224,3 +224,31 @@ body{
   opacity: 0.28;
   background: rgba(70, 160, 255, .55);
 }
+
+.placed-layer{
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  z-index: 3;
+}
+
+.weight--drop{
+  opacity: 1;
+  background: rgba(70, 160, 255, .88);
+  transform: translate(-50%, -50%) translateY(-140px);
+  transition:
+    transform 700ms cubic-bezier(.22, .61, .36, 1),
+    opacity 200ms ease;
+}
+
+.weight--drop.is-set{
+  transform: translate(-50%, -50%) translateY(0);
+}
+
+.weight--placed{
+  opacity: 1;
+  background: rgba(70, 160, 255, .88);
+  border: 1px solid rgba(255,255,255,.25);
+  color: rgba(255,255,255,0.95);
+  box-shadow: 0 12px 24px rgba(0,0,0,.35);
+}
