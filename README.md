@@ -2,7 +2,7 @@
 
 A physics-based balance simulation developed using pure HTML, CSS, and JavaScript (ES6+). Users can observe the torque balance and its real-time effects by placing weights at various points on the plank.
 
-# Live Demo: https://username.github.io/seesaw-simulation
+# Live Demo: https://berkedev13.github.io/seesaw-simulation
 
 ## 🧠 Thought Process and Design Decisions
 
