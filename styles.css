@@ -95,3 +95,101 @@ body{
   background: rgba(255,255,255,0.85);
   opacity: 0.7;
 }
+
+.app{
+  gap: 18px;
+}
+
+.hud{
+  display:grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 18px;
+}
+
+.stat{
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.10);
+  border-radius: 14px;
+  padding: 14px 16px;
+  text-align:center;
+}
+
+.stat .label{
+  font-size: 12px;
+  letter-spacing: .08em;
+  color: rgba(255,255,255,0.65);
+  font-weight: 700;
+}
+
+.stat .value{
+  margin-top: 6px;
+  font-size: 28px;
+  font-weight: 800;
+  color: rgba(255,255,255,0.92);
+}
+
+.footer{
+  width: 100%;
+  display:flex;
+  flex-direction: column;
+  align-items:center;
+  gap: 12px;
+}
+
+.reset-btn{
+  padding: 12px 18px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.92);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.reset-btn:hover{
+  background: rgba(255,255,255,0.12);
+}
+
+.log{
+  width: 100%;
+  height: 72px;
+  overflow-y: auto;
+  overflow-x: hidden;
+
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.10);
+  border-radius: 12px;
+
+  padding: 8px 14px;
+  color: rgba(255,255,255,0.85);
+  font-size: 14px;
+
+  scrollbar-gutter: stable;
+}
+
+.log.is-empty{
+  display:flex;
+  align-items:center;
+  color: rgba(255,255,255,0.55);
+}
+
+.log .item{
+  line-height: 24px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  position: relative;
+}
+
+.log .item::after{
+  content:"";
+  position:absolute;
+  left:0; right:0;
+  bottom:-1px;
+  height:1px;
+  background: rgba(255,255,255,0.08);
+}
+
+.log .item:last-child::after{
+  display:none;
+}

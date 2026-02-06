@@ -8,11 +8,36 @@
 </head>
 <body>
   <div class="app">
+    <div class="hud">
+      <div class="stat">
+        <div class="label">LEFT WEIGHT</div>
+        <div class="value">0.0 kg</div>
+      </div>
+      <div class="stat">
+        <div class="label">NEXT WEIGHT</div>
+        <div class="value">0 kg</div>
+      </div>
+      <div class="stat">
+        <div class="label">RIGHT WEIGHT</div>
+        <div class="value">0.0 kg</div>
+      </div>
+      <div class="stat">
+        <div class="label">TILT ANGLE</div>
+        <div class="value">0.0°</div>
+      </div>
+    </div>
+
     <div class="scene">
       <div class="pivot"></div>
       <div class="pivot-cap" aria-hidden="true"></div>
-
       <div class="plank" aria-hidden="true"></div>
+    </div>
+
+    <div class="footer">
+      <button class="reset-btn" type="button">Reset Seesaw</button>
+      <div class="log is-empty">
+        <div class="item">No drops yet</div>
+      </div>
     </div>
   </div>
 </body>
