@@ -1,312 +1,153 @@
-const sceneElement = document.getElementById("scene");
-const plankElement = document.getElementById("plank");
-const ghostElement = document.getElementById("ghostWeight");
+import {
+  CONST,
+  randomWeight,
+  getLocalCoordsOnBeamAxis,
+  computeSideTotals,
+  computeTorques,
+  computeTargetAngleDegree,
+  clampDropX,
+  isClickOnPlank,
+  formatLogLine,
+} from "./logic.js";
 
-const nextWeightValElement = document.getElementById("nextWeightVal");
-const tiltAngleValElement = document.getElementById("tiltAngleVal");
-const leftWeightValue = document.getElementById("leftWeightVal");
-const rightWeightValue = document.getElementById("rightWeightVal");
+import {
+  getEls,
+  renderHUD,
+  renderPlaced,
+  setGhostWeight,
+  updateGhostFromPointer,
+  createDropEl,
+  animateDropToPlaced,
+  renderLogs,
+  saveState,
+  loadState,
+  clearState,
+  normalizeLoadedState,
+  setPlankAngle,
+} from "./ui.js";
 
-const placedLayer = plankElement.querySelector(".placed-layer");
+const els = getEls();
 
-const resetBtn = document.getElementById("resetBtn");
-const logBox = document.getElementById("logBox");
+const state = {
+  placed: [],
+  logs: [],
+  nextWeight: randomWeight(),
 
-const PLANK_LENGTH = 600;
-const GHOST_OFFSET_Y = 140;
+  currentAngleDegree: 0,
+  targetAngleDegree: 0,
 
-const MAX_ANGLE = 30;
-const TORQUE_DIVISOR = 30;
-const FOLLOW_SPEED = 0.18;
-const SNAP_EPS = 0.02;
+  pointer: { has: false, x: 0, y: 0, rafPending: false },
+};
 
-const LOG_LIMIT = 30;
-const LOG_PLACEHOLDER = "No drops yet";
+boot();
+bindEvents();
+startTiltLoop();
 
-const STORAGE_KEY = "seesaw_state_m6";
-
-let currentAngleDeg = 0;
-let targetAngleDeg = 0;
-
-let nextWeightKg = randWeight();
-
-let placed = [];
-
-let logs = [];
-
-let leftTotal = 0;
-let rightTotal = 0;
-
-function randWeight() {
-  return Math.floor(Math.random() * 10) + 1;
-}
-
-function clamp(n, min, max) {
-  return Math.max(min, Math.min(max, n));
-}
-
-function degToRad(deg) {
-  return (deg * Math.PI) / 180;
-}
-
-function formatLogLine(kg, x) {
-  const side = x < 0 ? "left" : "right";
-  const dist = Math.round(Math.abs(x));
-  return `${kg}kg dropped on ${side} side at ${dist}px from center`;
-}
-
-function getLocalOnPlankAxis(clientX, clientY, angleDeg) {
-  const rect = plankElement.getBoundingClientRect();
-  const pivotX = rect.left + rect.width / 2;
-  const pivotY = rect.top + rect.height / 2;
-
-  const dx = clientX - pivotX;
-  const dy = clientY - pivotY;
-
-  const a = degToRad(angleDeg);
-
-  const localX = dx * Math.cos(a) + dy * Math.sin(a);
-  const localY = -dx * Math.sin(a) + dy * Math.cos(a);
-
-  return { localX, localY, pivotX, pivotY };
-}
-
-function localToWorld(pivotX, pivotY, localX, localY, angleDeg) {
-  const a = degToRad(angleDeg);
-  return {
-    x: pivotX + localX * Math.cos(a) - localY * Math.sin(a),
-    y: pivotY + localX * Math.sin(a) + localY * Math.cos(a),
-  };
-}
-
-function setNextWeight(kg) {
-  nextWeightKg = kg;
-  ghostElement.textContent = `${kg}kg`;
-  nextWeightValElement.textContent = `${kg} kg`;
-}
-
-function updateHudTotals() {
-  leftWeightValue.textContent = `${leftTotal.toFixed(1)} kg`;
-  rightWeightValue.textContent = `${rightTotal.toFixed(1)} kg`;
-}
-
-function recalcTargetAngle() {
-  let leftTorque = 0;
-  let rightTorque = 0;
-
-  for (const item of placed) {
-    const d = Math.abs(item.x);
-    if (item.x < 0) leftTorque += item.kg * d;
-    else rightTorque += item.kg * d;
+function boot() {
+  const saved = loadState();
+  if (saved) {
+    const normalized = normalizeLoadedState(saved);
+    state.placed = normalized.placed;
+    state.logs = normalized.logs;
+    state.nextWeight = normalized.nextWeight ?? randomWeight();
   }
 
-  const raw = (rightTorque - leftTorque) / TORQUE_DIVISOR;
-  targetAngleDeg = clamp(raw, -MAX_ANGLE, MAX_ANGLE);
+  setGhostWeight(els.ghostElement, state.nextWeight);
+
+  state.targetAngleDegree = computeTargetAngleDegree(computeTorques(state.placed));
+  renderPlaced(els.placedLayer, state.placed);
+  renderLogs(els.logBox, state.logs);
+
+  renderAll();
+  persist();
 }
 
-function sizeForKg(kg) {
-  const minPx = 28;
-  const maxPx = 64;
-  const k = clamp(kg, 1, 10);
-  return minPx + (k - 1) * (maxPx - minPx) / 9;
+function bindEvents() {
+  els.sceneElement.addEventListener("pointermove", onPointerMove);
+  els.plankElement.addEventListener("click", onPlankClick);
+  els.resetBtn.addEventListener("click", onReset);
 }
 
-function renderPlacedFromState() {
-  placedLayer.innerHTML = "";
-  for (const item of placed) {
-    const el = document.createElement("div");
-    el.className = "weight weight--placed";
-    el.textContent = `${item.kg}kg`;
-
-    const size = sizeForKg(item.kg);
-    el.style.width = `${size}px`;
-    el.style.height = `${size}px`;
-
-    el.style.left = `calc(50% + ${Math.round(item.x)}px)`;
-    el.style.top = `50%`;
-
-    placedLayer.appendChild(el);
-  }
+function renderAll() {
+  const totals = computeSideTotals(state.placed);
+  renderHUD(els, totals, state.nextWeight, state.currentAngleDegree);
 }
 
-function renderLogs() {
-  if (!logBox) return;
-
-  logBox.innerHTML = "";
-
-  if (!logs.length) {
-    logBox.classList.add("is-empty");
-    logBox.innerHTML = `<div class="item">${LOG_PLACEHOLDER}</div>`;
-    return;
-  }
-
-  logBox.classList.remove("is-empty");
-  for (const line of logs) {
-    const div = document.createElement("div");
-    div.className = "item";
-    div.textContent = line;
-    logBox.appendChild(div);
-  }
+function persist() {
+  saveState({
+    placed: state.placed,
+    nextWeight: state.nextWeight,
+    logs: state.logs,
+  });
 }
 
-function addLog(kg, x) {
-  const line = formatLogLine(kg, x);
-  logs = [line, ...logs].slice(0, LOG_LIMIT);
-  renderLogs();
+function onPointerMove(e) {
+  state.pointer.x = e.clientX;
+  state.pointer.y = e.clientY;
+  state.pointer.has = true;
+
+  if (state.pointer.rafPending) return;
+  state.pointer.rafPending = true;
+
+  requestAnimationFrame(() => {
+    state.pointer.rafPending = false;
+    updateGhostFromPointer(els, state.nextWeight, state.currentAngleDegree, state.pointer.x, state.pointer.y);
+  });
 }
 
-function saveState() {
-  const payload = {
-    placed,
-    logs,
-    nextWeightKg,
-  };
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-  } catch {}
+function onPlankClick(e) {
+  const { localX, localY } = getLocalCoordsOnBeamAxis(e.clientX, e.clientY, els.plankElement, state.currentAngleDegree);
+
+  if (!isClickOnPlank(localY)) return;
+
+  const dropX = clampDropX(localX, state.nextWeight);
+
+  state.placed.push({ kg: state.nextWeight, x: dropX });
+  state.targetAngleDegree = computeTargetAngleDegree(computeTorques(state.placed));
+
+  const line = formatLogLine(state.nextWeight, dropX);
+  state.logs = [line, ...state.logs].slice(0, CONST.LOG_LIMIT);
+  renderLogs(els.logBox, state.logs);
+
+  const dropElement = createDropEl(state.nextWeight, dropX);
+  els.placedLayer.appendChild(dropElement);
+  animateDropToPlaced(dropElement);
+
+  state.nextWeight = randomWeight();
+  setGhostWeight(els.ghostElement, state.nextWeight);
+
+  renderAll();
+  persist();
 }
 
-function loadState() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object") return null;
-    return parsed;
-  } catch {
-    return null;
-  }
-}
+function onReset() {
+  state.placed = [];
+  state.logs = [];
+  state.targetAngleDegree = 0;
 
-function clearState() {
-  try {
-    localStorage.removeItem(STORAGE_KEY);
-  } catch {}
-}
+  els.placedLayer.innerHTML = "";
+  renderLogs(els.logBox, state.logs);
 
-function normalizeLoadedState(saved) {
-  const normPlaced = [];
-  if (Array.isArray(saved?.placed)) {
-    for (const p of saved.placed) {
-      const kg = Number(p.kg);
-      const x = Number(p.x);
-      if (!Number.isFinite(kg) || !Number.isFinite(x)) continue;
-      if (kg < 1 || kg > 10) continue;
-      const half = PLANK_LENGTH / 2;
-      normPlaced.push({ kg, x: clamp(x, -half, half) });
-    }
-  }
+  state.nextWeight = randomWeight();
+  setGhostWeight(els.ghostElement, state.nextWeight);
 
-  const normLogs = Array.isArray(saved?.logs)
-    ? saved.logs.filter((s) => typeof s === "string").slice(0, LOG_LIMIT)
-    : [];
-
-  const nw = Number(saved?.nextWeightKg);
-  const normNext = Number.isFinite(nw) && nw >= 1 && nw <= 10 ? nw : null;
-
-  return { placed: normPlaced, logs: normLogs, nextWeightKg: normNext };
-}
-
-function updateGhostFromPointer(clientX, clientY) {
-  const sceneRect = sceneElement.getBoundingClientRect();
-
-  const { localX, pivotX, pivotY } = getLocalOnPlankAxis(
-    clientX,
-    clientY,
-    currentAngleDeg
-  );
-
-  const half = PLANK_LENGTH / 2;
-  const clampedLocalX = clamp(localX, -half, half);
-
-  const p = localToWorld(pivotX, pivotY, clampedLocalX, 0, currentAngleDeg);
-
-  let x = p.x - sceneRect.left;
-  let y = p.y - sceneRect.top - GHOST_OFFSET_Y;
-
-  const size = ghostElement.getBoundingClientRect().width || 64;
-  const pad = size / 2 + 8;
-  x = clamp(x, pad, sceneRect.width - pad);
-  y = clamp(y, pad, sceneRect.height - pad);
-
-  ghostElement.style.left = `${x}px`;
-  ghostElement.style.top = `${y}px`;
-}
-
-function createDropEl(kg, x) {
-  const el = document.createElement("div");
-  el.className = "weight weight--drop";
-  el.textContent = `${kg}kg`;
-
-  const size = sizeForKg(kg);
-  el.style.width = `${size}px`;
-  el.style.height = `${size}px`;
-
-  el.style.left = `calc(50% + ${Math.round(x)}px)`;
-  el.style.top = `50%`;
-  return el;
-}
-
-function dropWeightAt(x) {
-  if (x < 0) leftTotal += nextWeightKg;
-  else rightTotal += nextWeightKg;
-  updateHudTotals();
-
-  placed.push({ kg: nextWeightKg, x });
-
-  addLog(nextWeightKg, x);
-
-  recalcTargetAngle();
-
-  const dropEl = createDropEl(nextWeightKg, x);
-  placedLayer.appendChild(dropEl);
-  requestAnimationFrame(() => dropEl.classList.add("is-set"));
-
-  dropEl.addEventListener(
-    "transitionend",
-    () => {
-      dropEl.classList.remove("weight--drop", "is-set");
-      dropEl.classList.add("weight--placed");
-    },
-    { once: true }
-  );
-
-  setNextWeight(randWeight());
-
-  saveState();
-}
-
-function resetAll() {
-  placed = [];
-  logs = [];
-  leftTotal = 0;
-  rightTotal = 0;
-
-  targetAngleDeg = 0;
-
-  placedLayer.innerHTML = "";
-  updateHudTotals();
-  renderLogs();
-
-  setNextWeight(randWeight());
-
+  renderAll();
   clearState();
-  saveState();
+  persist();
 }
 
 function startTiltLoop() {
   function tick() {
-    currentAngleDeg += (targetAngleDeg - currentAngleDeg) * FOLLOW_SPEED;
+    state.currentAngleDegree += (state.targetAngleDegree - state.currentAngleDegree) * CONST.FOLLOW_SPEED;
 
-    if (Math.abs(targetAngleDeg - currentAngleDeg) < SNAP_EPS) {
-      currentAngleDeg = targetAngleDeg;
+    if (Math.abs(state.targetAngleDegree - state.currentAngleDegree) < CONST.SNAP_EPS) {
+      state.currentAngleDegree = state.targetAngleDegree;
     }
 
-    plankElement.style.transform =
-  `translateX(-50%) rotate(${currentAngleDeg}deg)`;
+    setPlankAngle(els, state.currentAngleDegree);
 
-    if (tiltAngleValElement) {
-      tiltAngleValElement.textContent = `${currentAngleDeg.toFixed(1)}°`;
+    if (state.pointer.has) {
+      updateGhostFromPointer(els, state.nextWeight, state.currentAngleDegree, state.pointer.x, state.pointer.y);
     }
 
     requestAnimationFrame(tick);
@@ -314,50 +155,3 @@ function startTiltLoop() {
 
   requestAnimationFrame(tick);
 }
-
-sceneElement.addEventListener("pointermove", (e) => {
-  updateGhostFromPointer(e.clientX, e.clientY);
-});
-
-plankElement.addEventListener("click", (e) => {
-  const { localX } = getLocalOnPlankAxis(e.clientX, e.clientY, currentAngleDeg);
-
-  const half = PLANK_LENGTH / 2;
-  const clampedX = clamp(localX, -half, half);
-
-  dropWeightAt(clampedX);
-});
-
-if (resetBtn) {
-  resetBtn.addEventListener("click", resetAll);
-}
-
-(function init() {
-  const saved = loadState();
-  if (saved) {
-    const norm = normalizeLoadedState(saved);
-    placed = norm.placed;
-    logs = norm.logs;
-
-    if (norm.nextWeightKg != null) setNextWeight(norm.nextWeightKg);
-    else setNextWeight(nextWeightKg);
-
-    leftTotal = 0;
-    rightTotal = 0;
-    for (const item of placed) {
-      if (item.x < 0) leftTotal += item.kg;
-      else rightTotal += item.kg;
-    }
-  } else {
-    setNextWeight(nextWeightKg);
-  }
-
-  updateHudTotals();
-  renderPlacedFromState();
-  renderLogs();
-
-  recalcTargetAngle();
-  startTiltLoop();
-
-  saveState();
-})();
