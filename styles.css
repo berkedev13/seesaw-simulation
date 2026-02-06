@@ -193,3 +193,34 @@ body{
 .log .item:last-child::after{
   display:none;
 }
+
+.ghost-overlay{
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  z-index: 8;
+}
+
+.weight{
+  position:absolute;
+  width: 64px;
+  height: 64px;
+  border-radius: 999px;
+
+  display:flex;
+  align-items:center;
+  justify-content:center;
+
+  font-weight: 800;
+  color: rgba(255,255,255,0.95);
+
+  box-shadow: 0 12px 24px rgba(0,0,0,.35);
+  border: 1px solid rgba(255,255,255,.25);
+
+  transform: translate(-50%, -50%);
+}
+
+.weight--ghost{
+  opacity: 0.28;
+  background: rgba(70, 160, 255, .55);
+}
